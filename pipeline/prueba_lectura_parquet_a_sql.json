@@ -1,0 +1,110 @@
+{
+	"name": "prueba_lectura_parquet_a_sql",
+	"properties": {
+		"activities": [
+			{
+				"name": "Copy data1",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Source",
+						"value": "@{'temp'}/@{concat('IngesportCRM', '/', 'contrato')}/"
+					},
+					{
+						"name": "Destination",
+						"value": "@{'dbo'}.@{'prucontra'}"
+					}
+				],
+				"typeProperties": {
+					"source": {
+						"type": "ParquetSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"wildcardFileName": "*.parquet",
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"tableOption": "autoCreate"
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "atos_contratoid",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "contratoid"
+								}
+							},
+							{
+								"source": {
+									"name": "atos_fechaultimafactura",
+									"type": "DateTime",
+									"physicalType": "INT96"
+								},
+								"sink": {
+									"name": "fachaultimafactura"
+								}
+							},
+							{
+								"source": {
+									"name": "modifiedon",
+									"type": "DateTime",
+									"physicalType": "INT96"
+								},
+								"sink": {
+									"name": "modifiedon"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Parquet_DataLake_Folder",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "temp",
+							"Domain": "IngesportCRM",
+							"Object": "contrato"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "dbo",
+							"Table": "prucontra"
+						}
+					}
+				]
+			}
+		],
+		"folder": {
+			"name": "PRUEBAS"
+		},
+		"annotations": []
+	}
+}

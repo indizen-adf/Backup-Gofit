@@ -1,0 +1,41 @@
+{
+	"name": "DS_Parquet_DataLake_Folder",
+	"properties": {
+		"description": "Dataset genérico para ficheros parquet en el Data Lake. El contenedor, folder, etc. son parámetros de entrada cuyos valores han de ser proporcionados al usar el dataset",
+		"linkedServiceName": {
+			"referenceName": "DataLakeIngesport_ADLS_G2",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Container": {
+				"type": "string"
+			},
+			"Domain": {
+				"type": "string"
+			},
+			"Object": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "DataLakeStorage"
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": {
+					"value": "@concat(dataset().Domain, '/', dataset().Object)",
+					"type": "Expression"
+				},
+				"fileSystem": {
+					"value": "@dataset().Container",
+					"type": "Expression"
+				}
+			},
+			"compressionCodec": "snappy"
+		},
+		"schema": []
+	}
+}

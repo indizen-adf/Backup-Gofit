@@ -1,0 +1,489 @@
+{
+	"name": "PL_Ingest_CRM_Parquet_copy1",
+	"properties": {
+		"description": "Ingesta en el Data Lake de todas las tablas de origen del dominio seleccionado (solo las que estén activas)",
+		"activities": [
+			{
+				"name": "Get_Entities_Names",
+				"description": "El código SQL de lookup se coge de una variable y se ejecuta directamente, es para comprobar que funciona la ejecución de código dinámico completo.\nRecoge todas las entidades de un esquema de origen del catálogo de metadatos",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Prepare_Code",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "@variables('SQLcode')",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "DLCatalog",
+							"Table": "Entity"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Bucle_Ingesta_Entidades",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get_Entities_Names",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get_Entities_Names').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "EVAL_Refresh_Type",
+							"description": "Dependiendo del tipo de refresco, ejecuta distintas actividades. Aunque está contemplado gestionarlo desde aquí, los incrementales de CRM se vana a gestionar aparte, por el tema de que en lugar de una query hay que usar el XML Fetch y, por tanto, no es común a otros casos donde se puede hacer todo en SQL",
+							"type": "Switch",
+							"dependsOn": [
+								{
+									"activity": "SiHayFicheros",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"on": {
+									"value": "@string(item().REFRESH_TYPE)",
+									"type": "Expression"
+								},
+								"cases": [
+									{
+										"value": "Full",
+										"activities": [
+											{
+												"name": "Ingest_Table_Full",
+												"type": "Copy",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "DynamicsSource"
+													},
+													"sink": {
+														"type": "ParquetSink",
+														"storeSettings": {
+															"type": "AzureBlobFSWriteSettings"
+														},
+														"formatSettings": {
+															"type": "ParquetWriteSettings",
+															"maxRowsPerFile": 100000
+														}
+													},
+													"enableStaging": false
+												},
+												"inputs": [
+													{
+														"referenceName": "DS_Ingesport_CRM",
+														"type": "DatasetReference",
+														"parameters": {
+															"Table": "@item().TABLE_NAME"
+														}
+													}
+												],
+												"outputs": [
+													{
+														"referenceName": "DS_Parquet_DataLake_Folder",
+														"type": "DatasetReference",
+														"parameters": {
+															"Container": {
+																"value": "@pipeline().globalParameters.GPR_Landing_Container",
+																"type": "Expression"
+															},
+															"Domain": {
+																"value": "@pipeline().globalParameters.GPR_DOM_CRM",
+																"type": "Expression"
+															},
+															"Object": "@item().TABLE_NAME"
+														}
+													}
+												]
+											},
+											{
+												"name": "SQL_Error",
+												"type": "ExecutePipeline",
+												"dependsOn": [
+													{
+														"activity": "Ingest_Table_Full",
+														"dependencyConditions": [
+															"Failed"
+														]
+													}
+												],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_SQL_Error",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"SQLErrorCode": {
+															"value": "@string(activity('Ingest_Table_Full').Output.errors[0].Code)",
+															"type": "Expression"
+														},
+														"SQLErrorMessage": {
+															"value": "@activity('Ingest_Table_Full').Output.errors[0].Message",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "Incremental",
+										"activities": [
+											{
+												"name": "PL_Ingest_CRM_incremental",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "PL_Ingest_CRM_Incremental",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"Entity_Id": {
+															"value": "@variables('EntityId')",
+															"type": "Expression"
+														},
+														"Entity_Name": {
+															"value": "@variables('EntityName')",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "Merge",
+										"activities": [
+											{
+												"name": "Ingest_Table_Merge",
+												"type": "Wait",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"waitTimeInSeconds": 1
+												}
+											}
+										]
+									}
+								]
+							}
+						},
+						{
+							"name": "Obtener_Metadatos",
+							"description": "Coger metadatos del folder y los ficheros contenidos. Posteriormente se evalúa primero si existe el folder, porque si no existe, el atributo childitems no será generado por esta actividad y petará cualquier operación que intente usarlo",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "DS_Parquet_DataLake_Folder",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": "@pipeline().globalParameters.GPR_Landing_Container",
+										"Domain": {
+											"value": "@pipeline().globalParameters.GPR_DOM_CRM",
+											"type": "Expression"
+										},
+										"Object": "@item().TABLE_NAME"
+									}
+								},
+								"fieldList": [
+									"childItems",
+									"exists"
+								],
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							}
+						},
+						{
+							"name": "VAR_Existe",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Obtener_Metadatos",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "ExisteFolder",
+								"value": {
+									"value": "@activity('Obtener_Metadatos').output.exists",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "SiHayFicheros",
+							"description": "Si la variable está a 0  significa que el folder está vacío o no existe, pero si es superior a 0 quiere decir que hay ficheros y por tanto hay que borrarlos",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Si_Existe_el_Folder",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@greater(int(variables('HayFicheros')), 0)",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "BorraFicheros",
+										"description": "Si hay ficheros, los borra antes de cargar ya que de lo contrario insertará nuevos sobre los existentes",
+										"type": "Delete",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "DS_Parquet_DataLake_Folder",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": "@pipeline().globalParameters.GPR_Landing_Container",
+													"Domain": {
+														"value": "@pipeline().globalParameters.GPR_DOM_CRM",
+														"type": "Expression"
+													},
+													"Object": "@item().TABLE_NAME"
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "Si_Existe_el_Folder",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Obtener_Metadatos",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "VAR_EntityId",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "VAR_EntityName",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@activity('Obtener_Metadatos').output.exists",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "No_Hay_Ficheros",
+										"description": "Si el folder no existe, no habrá ficheros que borrar, por lo que se fuerza a 0 en la variable a comprobar posteriormente. Para que no intenete borrar",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "HayFicheros",
+											"value": {
+												"value": "0",
+												"type": "Expression"
+											}
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Hay_Ficheros",
+										"description": "Coger la longitud del array con los ficheros. Será 0 si está vacío",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "HayFicheros",
+											"value": {
+												"value": "@string(length(activity('Obtener_Metadatos').output.childitems))",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "VAR_EntityId",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Obtener_Metadatos",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "EntityId",
+								"value": {
+									"value": "@activity('Obtener_Metadatos').output.ENTITY_ID",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "VAR_EntityName",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Obtener_Metadatos",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "EntityId",
+								"value": {
+									"value": "@activity('Obtener_Metadatos').output.ENTITY_NAME",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Prepare_Code",
+				"description": "Metemos el código en una variable en lugar de hacerlo directamente en la actividad de lookup. Esto es por estandarizar y por hacerlo todo lo más dinámico posible (el código de la variable podría venir de una tabla o un fichero de configuración)",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "SQLcode",
+					"value": {
+						"value": "SELECT  EN.[EntityId] AS ENTITY_ID,\n\t\tEN.[EntityName] AS TABLE_NAME,  \n        EN.[EntitySchema] AS TABLE_SCHEMA, \n        RT.[RefreshTypeName] as REFRESH_TYPE \nFROM [DLCatalog].[Entity] EN\nINNER JOIN DLCatalog.RefreshType RT ON\nEN.RefreshTypeId = RT.RefreshTypeId  WHERE EN.[DomainId] = (SELECT DomainId from DLCatalog.Domain where DomainName = '@{pipeline().globalParameters.GPR_DOM_CRM}') AND EN.[EntityStatus] = 'A'\nAND EN.[EntityBatchIngest] = 'Y'",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"container": {
+				"type": "string",
+				"defaultValue": "landing"
+			},
+			"domain": {
+				"type": "string",
+				"defaultValue": "IngesportCRM"
+			}
+		},
+		"variables": {
+			"SQLcode": {
+				"type": "String",
+				"defaultValue": "-- SELECT PARA RECOGER METADATOS DEL CATALOGO"
+			},
+			"HayFicheros": {
+				"type": "String"
+			},
+			"ExisteFolder": {
+				"type": "Boolean"
+			},
+			"EntityId": {
+				"type": "String"
+			},
+			"EntityName": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Ingestion"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-05-18T16:44:07Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

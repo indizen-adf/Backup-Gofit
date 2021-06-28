@@ -1,0 +1,727 @@
+{
+	"name": "PL_Load_Metadata_Dynamics365",
+	"properties": {
+		"description": "Carga los datos de entidades y columnas de Dynamics (Dataverse) en el catálogo de metadatos (DLCatalog). Las actividades pueden fallar porque ya estén los datos en las tablas, pero pasa a la siguiente actividad igualmente sin actualizar datos incorrectos. De todos modos, verificar que el fallo sea por violar un aPK en lugar de por otra causa. También srive como ejemplo de captura de eventos y errores",
+		"activities": [
+			{
+				"name": "Load_Entities_CRM",
+				"description": "Lee de un fichero CSV generado desde SSMS y carga en la tabla DLCatalog.Entity. Si se intenta lanzar más de una vez cascará porque detectará duplicados. Se puede controlar el error para que simplemente no haga nada. Ver el fichero DataverseGetTablesList.sql en el código.",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink"
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_CSV_DataLake",
+						"type": "DatasetReference",
+						"parameters": {
+							"container": "conf",
+							"domain": "IngesportCRM",
+							"object": "listas",
+							"file": "Ingesport_CRM_Tables_List"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "DLCatalog",
+							"Table": "Entity"
+						}
+					}
+				]
+			},
+			{
+				"name": "If_SQL_Error",
+				"description": "Si se produce un error, seguramente será porque los datos ya están cargados y hay duplicados. La expresión para evaluar un error de SQL y clave duplicada es la siguiente (por si se quiere usar)\n\n@and(equals(activity('Load_Entities_CRM').Error.ErrorCode, '2200'), equals(string(activity('Load_Entities_CRM').Output.errors[0].Code), '22301'))\n\nEn cualquier caso, se registra el error y se continua con la siguiente actividad",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Load_Entities_CRM",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('Load_Entities_CRM').Error.ErrorCode, '2200')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Wait2",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Set_SQL_Error_Code",
+							"description": "Cogemos el código de error devuelto por la bdd",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "ErrorSQL",
+								"value": {
+									"value": "@string(activity('Load_Entities_CRM').Output.errors[0].Code)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set _SQL_Error_Message",
+							"description": "Cogemos el mensaje de error devuelto por la bdd",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "ErrorSQLDesc",
+								"value": {
+									"value": "@activity('Load_Entities_CRM').Output.errors[0].Message",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Register_Event",
+							"description": "Escribe en la tabla de eventos del catálogo el error, etc.",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Set_SQL_Error_Code",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "Set _SQL_Error_Message",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[ADF].[SP_AddEvent]",
+								"storedProcedureParameters": {
+									"event_activity": {
+										"value": {
+											"value": "Load_Entities_CRM",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_dataflow": {
+										"value": null,
+										"type": "String"
+									},
+									"event_details": {
+										"value": {
+											"value": "@variables('ErrorSQLDesc')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_domain": {
+										"value": {
+											"value": "@pipeline().globalParameters.GPR_DOM_CRM",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_errorcode": {
+										"value": {
+											"value": "@variables('ErrorSQL')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_iserror": {
+										"value": "Y",
+										"type": "String"
+									},
+									"event_message": {
+										"value": "Error de SQL",
+										"type": "String"
+									},
+									"event_object": {
+										"value": "DLCatalog",
+										"type": "String"
+									},
+									"event_pipeline": {
+										"value": {
+											"value": "@pipeline().Pipeline",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_timestamp": {
+										"value": {
+											"value": "@utcnow()",
+											"type": "Expression"
+										},
+										"type": "DateTime"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "dlcatalog_AzureSQL",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Load_Columns_CRM",
+				"description": "Lee de un fichero CSV generado desde SSMS con la info de columnas y carga en la tabla DLCatalog.DataverseColumns. Si se intenta lanzar más de una vez cascará porque detectará duplicados. Se puede controlar el error para que simplemente no haga nada",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Load_Entities_CRM",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": "truncate table DLCatalog.DataverseColumns",
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_CSV_DataLake",
+						"type": "DatasetReference",
+						"parameters": {
+							"container": "conf",
+							"domain": "IngesportCRM",
+							"object": "listas",
+							"file": "Ingesport_CRM_Columns_List"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "DLCatalog",
+							"Table": "DataverseColumns"
+						}
+					}
+				]
+			},
+			{
+				"name": "Load_Columns_Final",
+				"description": "Lee de la tabla DLCatalog.Dataverse columns y de otras tablas del catálogo para componer las columnas y tipos en la entidad DLCatalog.EntityColumns.  Si se intenta lanzar más de una vez cascará porque detectará duplicados. Se puede controlar el error para que simplemente no haga nada",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Load_Columns_CRM",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT b.EntityId AS [EntityId],\n\t   b.EntityName AS [EntityName],\n\t   a.columnName AS [ColumnName],\n\t   ISNULL(c.DataType, 'No existe conversion para el tipo ' + a.[ColumnType]) AS [ColumnType],\n\t   --a.[ColumnType] as [tipo_original],\n\t   a.isNullable AS [IsNullable]\nFROM\n  \t[DLCatalog].[DataverseColumns] a\nleft JOIN [DLCatalog].[Entity] b\nON a.[tableName] = b.EntityName\nleft JOIN [DLCatalog].[DataTypesConversion] C\nON a.[columnType] = c.[DataTypeDb]\nWHERE b.[EntitySchema] = 'dbo' AND b.[EntityDB] = 'Ingesport'\nORDER BY [EntityName], [ColumnName];",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink"
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "EntityId",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "EntityId",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "ColumnName",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "ColumnName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ColumnType",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "ColumnType",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "IsNullable",
+									"type": "String",
+									"physicalType": "char"
+								},
+								"sink": {
+									"name": "IsNullable",
+									"type": "String",
+									"physicalType": "char"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "DLCatalog",
+							"Table": "Entity"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "DLCatalog",
+							"Table": "EntityColumn"
+						}
+					}
+				]
+			},
+			{
+				"name": "If_SQL_Error_II",
+				"description": "Si se produce un error, seguramente será porque los datos ya están cargados y hay duplicados. La expresión para evaluar un error de SQL y clave duplicada es la siguiente (por si se quiere usar)\n\n@and(equals(activity('Load_Entities_CRM').Error.ErrorCode, '2200'), equals(string(activity('Load_Entities_CRM').Output.errors[0].Code), '22301'))\n\nEn cualquier caso, se registra el error y se continua con la siguiente actividad",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Load_Columns_CRM",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('Load_Entities_CRM').Error.ErrorCode, '2200')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Wait2_copy1",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Set_SQL_Error_Code_II",
+							"description": "Cogemos el código de error devuelto por la bdd",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "ErrorSQL",
+								"value": {
+									"value": "@string(activity('Load_Columns_CRM').Output.errors[0].Code)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set _SQL_Error_Message_II",
+							"description": "Cogemos el mensaje de error devuelto por la bdd",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "ErrorSQLDesc",
+								"value": {
+									"value": "@activity('Load_Columns_CRM').Output.errors[0].Message",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Register_Event_II",
+							"description": "Escribe en la tabla de eventos del catálogo el error, etc.",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Set_SQL_Error_Code_II",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "Set _SQL_Error_Message_II",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[ADF].[SP_AddEvent]",
+								"storedProcedureParameters": {
+									"event_activity": {
+										"value": {
+											"value": "Load_Columns_CRM",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_dataflow": {
+										"value": null,
+										"type": "String"
+									},
+									"event_details": {
+										"value": {
+											"value": "@variables('ErrorSQLDesc')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_domain": {
+										"value": {
+											"value": "@pipeline().globalParameters.GPR_DOM_CRM",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_errorcode": {
+										"value": {
+											"value": "@variables('ErrorSQL')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_iserror": {
+										"value": "Y",
+										"type": "String"
+									},
+									"event_message": {
+										"value": "Error de SQL",
+										"type": "String"
+									},
+									"event_object": {
+										"value": "DLCatalog",
+										"type": "String"
+									},
+									"event_pipeline": {
+										"value": {
+											"value": "@pipeline().Pipeline",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_timestamp": {
+										"value": {
+											"value": "@utcnow()",
+											"type": "Expression"
+										},
+										"type": "DateTime"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "dlcatalog_AzureSQL",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "If_SQL_Error_III",
+				"description": "Si se produce un error, seguramente será porque los datos ya están cargados y hay duplicados. La expresión para evaluar un error de SQL y clave duplicada es la siguiente (por si se quiere usar)\n\n@and(equals(activity('Load_Entities_CRM').Error.ErrorCode, '2200'), equals(string(activity('Load_Entities_CRM').Output.errors[0].Code), '22301'))\n\nEn cualquier caso, se registra el error y se continua con la siguiente actividad",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Load_Columns_Final",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('Load_Entities_CRM').Error.ErrorCode, '2200')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Wait2_copy1_copy1",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Set_SQL_Error_Code_III",
+							"description": "Cogemos el código de error devuelto por la bdd",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "ErrorSQL",
+								"value": {
+									"value": "@string(activity('Load_Columns_Final').Output.errors[0].Code)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set _SQL_Error_Message_III",
+							"description": "Cogemos el mensaje de error devuelto por la bdd",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "ErrorSQLDesc",
+								"value": {
+									"value": "@activity('Load_Columns_Final').Output.errors[0].Message",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Register_Event_III",
+							"description": "Escribe en la tabla de eventos del catálogo el error, etc.",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Set_SQL_Error_Code_III",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "Set _SQL_Error_Message_III",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[ADF].[SP_AddEvent]",
+								"storedProcedureParameters": {
+									"event_activity": {
+										"value": {
+											"value": "Load_Columns_Final",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_dataflow": {
+										"value": null,
+										"type": "String"
+									},
+									"event_details": {
+										"value": {
+											"value": "@variables('ErrorSQLDesc')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_domain": {
+										"value": {
+											"value": "@pipeline().globalParameters.GPR_DOM_CRM",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_errorcode": {
+										"value": {
+											"value": "@variables('ErrorSQL')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_iserror": {
+										"value": "Y",
+										"type": "String"
+									},
+									"event_message": {
+										"value": "Error de SQL",
+										"type": "String"
+									},
+									"event_object": {
+										"value": "DLCatalog",
+										"type": "String"
+									},
+									"event_pipeline": {
+										"value": {
+											"value": "@pipeline().Pipeline",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"event_timestamp": {
+										"value": {
+											"value": "@utcnow()",
+											"type": "Expression"
+										},
+										"type": "DateTime"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "dlcatalog_AzureSQL",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"variables": {
+			"ErrorSQL": {
+				"type": "String"
+			},
+			"ErrorSQLDesc": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Metadata"
+		},
+		"annotations": []
+	}
+}

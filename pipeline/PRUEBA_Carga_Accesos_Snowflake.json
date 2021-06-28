@@ -1,0 +1,449 @@
+{
+	"name": "PRUEBA_Carga_Accesos_Snowflake",
+	"properties": {
+		"description": "Carga desde ficheros parquet a Snowflake de la tabla de accesos del CRM",
+		"activities": [
+			{
+				"name": "Carga_Accesos",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ParquetSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"wildcardFileName": "*",
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "SnowflakeSink",
+						"importSettings": {
+							"type": "SnowflakeImportCopyCommand"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "atos_accesoid",
+									"type": "String"
+								},
+								"sink": {
+									"name": "ATOS_ACCESOID",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "createdon",
+									"type": "DateTime"
+								},
+								"sink": {
+									"name": "CREATEDON",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"name": "createdby",
+									"type": "String"
+								},
+								"sink": {
+									"name": "CREATEDBY",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "modifiedon",
+									"type": "DateTime"
+								},
+								"sink": {
+									"name": "MODIFIEDON",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"name": "modifiedby",
+									"type": "String"
+								},
+								"sink": {
+									"name": "MODIFIEDBY",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "createdonbehalfby",
+									"type": "String"
+								},
+								"sink": {
+									"name": "CREATEDONBEHALFBY",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "modifiedonbehalfby",
+									"type": "String"
+								},
+								"sink": {
+									"name": "MODIFIEDONBEHALFBY",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "createdbyname",
+									"type": "String"
+								},
+								"sink": {
+									"name": "CREATEDBYNAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "createdbyyominame",
+									"type": "String"
+								},
+								"sink": {
+									"name": "CREATEDBYYOMINAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "createdonbehalfbyname",
+									"type": "String"
+								},
+								"sink": {
+									"name": "CREATEDONBEHALFBYNAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "createdonbehalfbyyominame",
+									"type": "String"
+								},
+								"sink": {
+									"name": "CREATEDONBEHALFBYYOMINAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "modifiedbyname",
+									"type": "String"
+								},
+								"sink": {
+									"name": "MODIFIEDBYNAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "modifiedbyyominame",
+									"type": "String"
+								},
+								"sink": {
+									"name": "MODIFIEDBYYOMINAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "modifiedonbehalfbyname",
+									"type": "String"
+								},
+								"sink": {
+									"name": "MODIFIEDONBEHALFBYNAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "modifiedonbehalfbyyominame",
+									"type": "String"
+								},
+								"sink": {
+									"name": "MODIFIEDONBEHALFBYYOMINAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "ownerid",
+									"type": "String"
+								},
+								"sink": {
+									"name": "OWNERID",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "owneridname",
+									"type": "String"
+								},
+								"sink": {
+									"name": "OWNERIDNAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "owneridyominame",
+									"type": "String"
+								},
+								"sink": {
+									"name": "OWNERIDYOMINAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "owningbusinessunit",
+									"type": "String"
+								},
+								"sink": {
+									"name": "OWNINGBUSINESSUNIT",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "owninguser",
+									"type": "String"
+								},
+								"sink": {
+									"name": "OWNINGUSER",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "owningteam",
+									"type": "String"
+								},
+								"sink": {
+									"name": "OWNINGTEAM",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "statecode",
+									"type": "Int32"
+								},
+								"sink": {
+									"name": "STATECODE",
+									"type": "Int64"
+								}
+							},
+							{
+								"source": {
+									"name": "statuscode",
+									"type": "Int32"
+								},
+								"sink": {
+									"name": "STATUSCODE",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "importsequencenumber",
+									"type": "Int32"
+								},
+								"sink": {
+									"name": "IMPORTSEQUENCENUMBER",
+									"type": "Int64"
+								}
+							},
+							{
+								"source": {
+									"name": "overriddencreatedon",
+									"type": "DateTime"
+								},
+								"sink": {
+									"name": "OVERRIDDENCREATEDON",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"name": "timezoneruleversionnumber",
+									"type": "Int32"
+								},
+								"sink": {
+									"name": "TIMEZONERULEVERSIONNUMBER",
+									"type": "Int64"
+								}
+							},
+							{
+								"source": {
+									"name": "utcconversiontimezonecode",
+									"type": "Int32"
+								},
+								"sink": {
+									"name": "UTCCONVERSIONTIMEZONECODE",
+									"type": "Int64"
+								}
+							},
+							{
+								"source": {
+									"name": "atos_name",
+									"type": "String"
+								},
+								"sink": {
+									"name": "ATOS_NAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "atos_areadeacceso",
+									"type": "String"
+								},
+								"sink": {
+									"name": "ATOS_AREADEACCESO",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "atos_centrodeportivoid",
+									"type": "String"
+								},
+								"sink": {
+									"name": "ATOS_CENTRODEPORTIVOID",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "atos_clienteid",
+									"type": "String"
+								},
+								"sink": {
+									"name": "ATOS_CLIENTEID",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "atos_direccionacceso",
+									"type": "Boolean"
+								},
+								"sink": {
+									"name": "ATOS_DIRECCIONACCESO",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "atos_fechahora",
+									"type": "DateTime"
+								},
+								"sink": {
+									"name": "ATOS_FECHAHORA",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"name": "atos_idtorno",
+									"type": "String"
+								},
+								"sink": {
+									"name": "ATOS_IDTORNO",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "atos_centrodeportivoidname",
+									"type": "String"
+								},
+								"sink": {
+									"name": "ATOS_CENTRODEPORTIVOIDNAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "atos_clienteidname",
+									"type": "String"
+								},
+								"sink": {
+									"name": "ATOS_CLIENTEIDNAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "atos_clienteidyominame",
+									"type": "String"
+								},
+								"sink": {
+									"name": "ATOS_CLIENTEIDYOMINAME",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "bdo_respuestatg",
+									"type": "String"
+								},
+								"sink": {
+									"name": "BDO_RESPUESTATG",
+									"type": "String"
+								}
+							}
+						]
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Parquet_Blob_Folder",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "landing",
+							"Domain": "IngesportCRM",
+							"Object": "atos_acceso"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Ingesport_Snowflake",
+						"type": "DatasetReference",
+						"parameters": {
+							"SchemaName": "PUBLIC",
+							"TableName": "ACCESO"
+						}
+					}
+				]
+			}
+		],
+		"folder": {
+			"name": "PRUEBAS"
+		},
+		"annotations": []
+	}
+}

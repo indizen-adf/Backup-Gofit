@@ -1,0 +1,24 @@
+{
+	"name": "PruNavision",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "IngesportNavision18",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"TABLA": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "PRUEBAS"
+		},
+		"annotations": [],
+		"type": "SqlServerTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "@dataset().TABLA"
+		}
+	}
+}

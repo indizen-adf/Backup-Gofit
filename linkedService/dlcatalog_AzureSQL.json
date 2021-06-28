@@ -1,0 +1,11 @@
+{
+	"name": "dlcatalog_AzureSQL",
+	"properties": {
+		"description": "BDD con el catálogo de metadatos usado desde ADF para ejecución dinámica de pipelines/actividades y para mantener la información de las diferentes entidades y artefactos usados en el proyecto",
+		"annotations": [],
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"connectionString": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ingesportlakehouse.database.windows.net;Initial Catalog=dlcatalog"
+		}
+	}
+}

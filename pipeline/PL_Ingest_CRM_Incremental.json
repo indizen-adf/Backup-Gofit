@@ -1,0 +1,139 @@
+{
+	"name": "PL_Ingest_CRM_Incremental",
+	"properties": {
+		"activities": [
+			{
+				"name": "Carga_desde_una_fecha",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "VAR_Prepare_Code",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DynamicsSource",
+						"query": {
+							"value": "@variables('XMLFetchCode')",
+							"type": "Expression"
+						}
+					},
+					"sink": {
+						"type": "ParquetSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "ParquetWriteSettings"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Ingesport_CRM",
+						"type": "DatasetReference",
+						"parameters": {
+							"Table": "atos_acceso"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Parquet_DataLake_Folder",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": {
+								"value": "@pipeline().globalParameters.GPR_Landing_Container",
+								"type": "Expression"
+							},
+							"Domain": {
+								"value": "@pipeline().globalParameters.GPR_DOM_CRM",
+								"type": "Expression"
+							},
+							"Object": {
+								"value": "@pipeline().parameters.Entity_Name",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "VAR_Prepare_Code",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Recoge_atributo_valor",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "XMLFetchCode",
+					"value": "<fetch>\n  <entity name=\"@{pipeline().parameters.Entity_Name}\">\n    <all-attributes />\n     <filter type=\"and\">\n      <condition attribute =\"@{activity('Recoge_atributo_valor').output.firstRow.ATRIBUTO}\" value=\"@{activity('Recoge_atributo_valor').output.firstRow.VALOR}\" operator=\"on-or-after\"/>\n    </filter>\n  </entity>\n</fetch>\n"
+				}
+			},
+			{
+				"name": "Recoge_atributo_valor",
+				"description": "Recoge de la tabla de metadatos, la columna de fecha desde a cargar, ya que el nombre de la columna y el valor pueden ser variables para diferentes tablas.\nNOTA: solo para incrementales basados en fecha",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT [IncrementalColumn] as ATRIBUTO, [IncrementalValue] as VALOR\nFROM [DLCatalog].[IncrementalRefresh] \nWHERE [EntityId] = @{int(pipeline().parameters.Entity_Id)}",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "DLCatalog",
+							"Table": "IncrementalRefresh"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Entity_Id": {
+				"type": "string"
+			},
+			"Entity_Name": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"XMLFetchCode": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Ingestion/Incremental"
+		},
+		"annotations": []
+	}
+}

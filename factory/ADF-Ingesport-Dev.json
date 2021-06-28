@@ -1,0 +1,60 @@
+{
+	"name": "ADF-Ingesport-Dev",
+	"properties": {
+		"globalParameters": {
+			"GPR_DOM_CRM": {
+				"type": "string",
+				"value": "IngesportCRM"
+			},
+			"GPR_Landing_Container": {
+				"type": "string",
+				"value": "landing"
+			},
+			"GPR_Staging_Container": {
+				"type": "string",
+				"value": "stage"
+			},
+			"GPR_Temp_Container": {
+				"type": "string",
+				"value": "temp"
+			},
+			"GPR_Code_Container": {
+				"type": "string",
+				"value": "code"
+			},
+			"GPR_Common_Container": {
+				"type": "string",
+				"value": "Common"
+			},
+			"GPR_STA_INgesport_DEV": {
+				"type": "string",
+				"value": "adls2ingesport01"
+			},
+			"GPR_STA_Ingesport_PROD": {
+				"type": "string",
+				"value": "datalake2ingesportprod"
+			},
+			"GPR_Config_Container": {
+				"type": "string",
+				"value": "conf"
+			},
+			"GPR_DOM_MYGOFITAPP": {
+				"type": "string",
+				"value": "IngesportMyGofitApp"
+			},
+			"GPR_DOM_FINANCE": {
+				"type": "string",
+				"value": "IngesportFinance"
+			},
+			"GPR_DOM_FINANCE_HIST": {
+				"type": "string",
+				"value": "IngesportFinanceHist"
+			},
+			"GPR_Hist_Container": {
+				"type": "string",
+				"value": "historical"
+			}
+		}
+	},
+	"location": "westeurope"
+}

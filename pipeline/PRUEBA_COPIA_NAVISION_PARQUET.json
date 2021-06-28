@@ -1,0 +1,83 @@
+{
+	"name": "PRUEBA_COPIA_NAVISION_PARQUET",
+	"properties": {
+		"description": "Prueba de copia a Parquet para ver si funciona la instalación de la JRE en la máquina donde está el SH I. Runtime (OK). Se mapea un único campo de una tabla casmbiando el nombre del mismo para que lo soporte Parquet",
+		"activities": [
+			{
+				"name": "Copy data1",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "ParquetSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "ParquetWriteSettings"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "Document Type",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "Document_Type",
+									"physicalType": "INT_32"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "PruNavision",
+						"type": "DatasetReference",
+						"parameters": {
+							"TABLA": "CENTRO DEPORTIVO VALLEHERMOSO$Cust_ Ledger Entry"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Parquet_DataLake_Folder",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "temp",
+							"Domain": "pruebaNav",
+							"Object": "kk"
+						}
+					}
+				]
+			}
+		],
+		"folder": {
+			"name": "PRUEBAS"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,48 @@
+{
+	"name": "DS_CSV_Blob_Folder",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "BlobStorageIngesport_SAS",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"container": {
+				"type": "string"
+			},
+			"domain": {
+				"type": "string"
+			},
+			"object": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "DataLakeStorage"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": {
+					"value": "@dataset().object",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().domain",
+					"type": "Expression"
+				},
+				"container": {
+					"value": "@dataset().container",
+					"type": "Expression"
+				}
+			},
+			"columnDelimiter": ",",
+			"rowDelimiter": "\r\n",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	}
+}

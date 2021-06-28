@@ -1,0 +1,139 @@
+{
+	"name": "PRUEBA_Carga_Socios_Accesos_Snowflake_copy1",
+	"properties": {
+		"description": "Carga desde ficheros parquet a Snowflake de la tabla de accesos de MyGofitApp",
+		"activities": [
+			{
+				"name": "Carga_Socios_Accesos",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ParquetSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"wildcardFileName": "*",
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "SnowflakeSink",
+						"importSettings": {
+							"type": "SnowflakeImportCopyCommand"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "AvisadoEmailBit",
+									"type": "Boolean"
+								},
+								"sink": {
+									"name": "AVISADOEMAILBIT",
+									"type": "Boolean"
+								}
+							},
+							{
+								"source": {
+									"name": "AvisadoPushBit",
+									"type": "Boolean"
+								},
+								"sink": {
+									"name": "AVISADOPUSHBIT",
+									"type": "Boolean"
+								}
+							},
+							{
+								"source": {
+									"name": "FechaHora",
+									"type": "DateTime"
+								},
+								"sink": {
+									"name": "FECHAHORA",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"name": "Id",
+									"type": "Int64"
+								},
+								"sink": {
+									"name": "ID",
+									"type": "Int64"
+								}
+							},
+							{
+								"source": {
+									"name": "IdCentro",
+									"type": "Int64"
+								},
+								"sink": {
+									"name": "IDCENTRO",
+									"type": "Int64"
+								}
+							},
+							{
+								"source": {
+									"name": "IdSocio",
+									"type": "Int64"
+								},
+								"sink": {
+									"name": "IDSOCIO",
+									"type": "Int64"
+								}
+							},
+							{
+								"source": {
+									"name": "TipoAcceso",
+									"type": "Int32"
+								},
+								"sink": {
+									"name": "TIPOACCESO",
+									"type": "Int64"
+								}
+							}
+						]
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Parquet_Blob_Folder",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "historical",
+							"Domain": "IngesportMyGofitApp",
+							"Object": "Socios_Accesos_2021-06-24"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Ingesport_Snowflake",
+						"type": "DatasetReference",
+						"parameters": {
+							"SchemaName": "PUBLIC",
+							"TableName": "SOCIOS_ACCESOS"
+						}
+					}
+				]
+			}
+		],
+		"folder": {
+			"name": "PRUEBAS"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,34 @@
+{
+	"name": "DS_MyGofit_AzureSQL",
+	"properties": {
+		"description": "Dataset genérico para accesos a la bdd de MYGOFFITAPP. El esquema y la tabla han de ser pasados como parámetros de entrada",
+		"linkedServiceName": {
+			"referenceName": "MyGofit_AzureSQL",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Schema": {
+				"type": "string"
+			},
+			"Table": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "Azure SQL"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@dataset().Schema",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().Table",
+				"type": "Expression"
+			}
+		}
+	}
+}

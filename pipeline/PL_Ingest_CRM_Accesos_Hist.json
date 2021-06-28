@@ -1,0 +1,97 @@
+{
+	"name": "PL_Ingest_CRM_Accesos_Hist",
+	"properties": {
+		"description": "Carga TODOS los datos de accesos del CRM en el contenedor histórical",
+		"activities": [
+			{
+				"name": "Ingest_Table_Full_Parquet",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DynamicsSource"
+					},
+					"sink": {
+						"type": "ParquetSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "ParquetWriteSettings",
+							"maxRowsPerFile": 100000
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Ingesport_CRM",
+						"type": "DatasetReference",
+						"parameters": {
+							"Table": "atos_acceso"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Parquet_DataLake_Folder",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": {
+								"value": "@pipeline().globalParameters.GPR_Landing_Container",
+								"type": "Expression"
+							},
+							"Domain": {
+								"value": "@pipeline().globalParameters.GPR_DOM_CRM",
+								"type": "Expression"
+							},
+							"Object": "atos_acceso"
+						}
+					}
+				]
+			},
+			{
+				"name": "SQL_Error",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Ingest_Table_Full_Parquet",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_SQL_Error",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"SQLErrorCode": {
+							"value": "@string(activity('Ingest_Table_Full_Parquet').Output.errors[0].Code)",
+							"type": "Expression"
+						},
+						"SQLErrorMessage": {
+							"value": "@activity('Ingest_Table_Full_Parquet').Output.errors[0].Message",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"folder": {
+			"name": "Ingestion/Historical_Data"
+		},
+		"annotations": []
+	}
+}

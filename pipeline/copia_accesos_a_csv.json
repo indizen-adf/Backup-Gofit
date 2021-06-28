@@ -1,0 +1,77 @@
+{
+	"name": "copia_accesos_a_csv",
+	"properties": {
+		"activities": [
+			{
+				"name": "Copy data1",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ParquetSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"wildcardFileName": "*.parquet",
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Parquet_DataLake_Folder",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "landing",
+							"Domain": "IngesportCRM",
+							"Object": "atos_acceso"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_CSV_DataLake_Folder",
+						"type": "DatasetReference",
+						"parameters": {
+							"container": "temp",
+							"domain": "IngesportCRM",
+							"object": "atos_acceso"
+						}
+					}
+				]
+			}
+		],
+		"folder": {
+			"name": "PRUEBAS"
+		},
+		"annotations": []
+	}
+}

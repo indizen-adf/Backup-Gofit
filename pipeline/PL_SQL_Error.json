@@ -1,0 +1,101 @@
+{
+	"name": "PL_SQL_Error",
+	"properties": {
+		"description": "Actividades que se ejecutan cuando ocurre un error de SQL",
+		"activities": [
+			{
+				"name": "Register_SQL_Error",
+				"description": "Escribe en la tabla de eventos del catálogo el error, etc.",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[ADF].[SP_AddEvent]",
+					"storedProcedureParameters": {
+						"event_activity": {
+							"value": {
+								"value": "Load_Columns_Final",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"event_dataflow": {
+							"value": null,
+							"type": "String"
+						},
+						"event_details": {
+							"value": {
+								"value": "@pipeline().parameters.SQLErrorMessage",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"event_domain": {
+							"value": {
+								"value": "@pipeline().globalParameters.GPR_DOM_CRM",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"event_errorcode": {
+							"value": {
+								"value": "@pipeline().parameters.SQLErrorCode",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"event_iserror": {
+							"value": "Y",
+							"type": "String"
+						},
+						"event_message": {
+							"value": "Error de SQL",
+							"type": "String"
+						},
+						"event_object": {
+							"value": "DLCatalog",
+							"type": "String"
+						},
+						"event_pipeline": {
+							"value": {
+								"value": "@pipeline().Pipeline",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"event_timestamp": {
+							"value": {
+								"value": "@utcnow()",
+								"type": "Expression"
+							},
+							"type": "DateTime"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "dlcatalog_AzureSQL",
+					"type": "LinkedServiceReference"
+				}
+			}
+		],
+		"parameters": {
+			"SQLErrorCode": {
+				"type": "string"
+			},
+			"SQLErrorMessage": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "Common"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,98 @@
+{
+	"name": "PL_Ingest_MyGofitApp_Socios_Accesos_Hist",
+	"properties": {
+		"description": "Primera carga para el histórico) hasta el 24/06/2021. (o la que se ponga en el parámetro si esto se repite) A partir de Aquí serían incrementale",
+		"activities": [
+			{
+				"name": "Ingest_Table_Full",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT * FROM @{pipeline().parameters.Schema}.\t\n@{pipeline().parameters.Table}\nWHERE CAST(FechaHora as DATE) <= '@{pipeline().parameters.DateUntil}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "04:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "ParquetSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "ParquetWriteSettings",
+							"maxRowsPerFile": 1000000
+						}
+					},
+					"enableStaging": false,
+					"parallelCopies": 5
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_MyGofit_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": {
+								"value": "@pipeline().parameters.Schema",
+								"type": "Expression"
+							},
+							"Table": {
+								"value": "@pipeline().parameters.Table",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Parquet_DataLake_Folder",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": {
+								"value": "@pipeline().globalParameters.GPR_Hist_Container",
+								"type": "Expression"
+							},
+							"Domain": {
+								"value": "@pipeline().globalParameters.GPR_DOM_MYGOFITAPP",
+								"type": "Expression"
+							},
+							"Object": {
+								"value": "@concat(pipeline().parameters.Table, '_', pipeline().parameters.DateUntil)",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			}
+		],
+		"parameters": {
+			"Schema": {
+				"type": "string",
+				"defaultValue": "dbo"
+			},
+			"Table": {
+				"type": "string",
+				"defaultValue": "Socios_Accesos"
+			},
+			"DateUntil": {
+				"type": "string",
+				"defaultValue": "2021-06-24"
+			}
+		},
+		"folder": {
+			"name": "Ingestion/Historical_Data"
+		},
+		"annotations": []
+	}
+}

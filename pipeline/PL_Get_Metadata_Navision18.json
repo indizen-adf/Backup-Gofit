@@ -1,0 +1,280 @@
+{
+	"name": "PL_Get_Metadata_Navision18",
+	"properties": {
+		"description": "OK - Cogemos las definiciones de tablas y columnas del diccionario de SQL Server y las cargamos directamente en la tabla de entidades del DLCatalog primero y después en la de columns...\nSe hace por esquema y se controla que no existan ya esos datos en ambas tablas",
+		"activities": [
+			{
+				"name": "CP_Get_Tables_to_Stage",
+				"description": "Coge los metadatos de las entidades del diccionario de datos y los carga en el catálogo de metadatos del proyecto.\nComo usa el Self Hosted Integration Runtime, hay que habilitar la ip en el proxy de Azure SQL",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"sqlReaderQuery": {
+							"value": "SELECT TABLE_NAME  AS [EntityName],\n       TABLE_CATALOG AS [EntityDB],\n       TABLE_SCHEMA AS [EntitySchema],\n       TABLE_TYPE AS [EntityType]\nFROM\n  \tINFORMATION_SCHEMA.TABLES\nWHERE TABLE_SCHEMA = '@{pipeline().parameters.table_schema}'\nORDER BY TABLE_SCHEMA, TABLE_NAME;",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": "drop table if exists Stage.EntityST;",
+						"tableOption": "autoCreate",
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Navision18_SQLServer",
+						"type": "DatasetReference",
+						"parameters": {
+							"Table": "TABLES"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Stage",
+							"Table": "EntityST"
+						}
+					}
+				]
+			},
+			{
+				"name": "CP_Get_Columns_to_Stage",
+				"description": "Lo mismo, pero para las columnas",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"sqlReaderQuery": {
+							"value": "SELECT TABLE_NAME  AS [EntityName],\n       TABLE_CATALOG AS [EntityDB],\n       TABLE_SCHEMA AS [EntitySchema],\n\t   a.COLUMN_NAME AS [ColumnName],\n\t   a.IS_NULLABLE AS [IsNullable],\n\t   a.DATA_TYPE AS [ColumnType]\nFROM\n  \tINFORMATION_SCHEMA.COLUMNS a\nWHERE a.TABLE_SCHEMA = '@{pipeline().parameters.table_schema}'\nORDER BY TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME;",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": "drop table if exists Stage.EntityColumnST",
+						"tableOption": "autoCreate",
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Navision18_SQLServer",
+						"type": "DatasetReference",
+						"parameters": {
+							"Table": "COLUMNS"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Stage",
+							"Table": "EntityColumnST"
+						}
+					}
+				]
+			},
+			{
+				"name": "Populate_Entity",
+				"description": "Carga los datos desde el área de stage comprobando que no hay duplicados",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "CP_Get_Tables_to_Stage",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "CP_Get_Columns_to_Stage",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT st.[EntityName] AS [EntityName],\n       st.[EntityDB] AS [EntityDB],\n       st.[EntitySchema] AS [EntitySchema],\n       'I' AS [EntityStatus],   -- Por defecto dejamos las entidades como inactivas hasta determinar las necesarias\n       CURRENT_TIMESTAMP AS [EntityCreationTimestamp],\n       CURRENT_TIMESTAMP AS [EntityUpdateTimestamp],\n       NULL AS [EntityComment],\n       (SELECT DbTypeId FROM [DLCatalog].[DbType] where DbTypeName = '@{pipeline().parameters.database_type}') AS [DbTypeId],\n       NULL AS [EntityPartitionKey],\n       NULL AS [EntityAlias],\n       CASE \n       \t\tWHEN [EntityType] = 'BASE TABLE' THEN  (SELECT [EntityTypeId] FROM [DLCatalog].[EntityType] WHERE [EntityTypeName] = 'Table')\n       \t\tWHEN [EntityType] = 'VIEW' THEN (SELECT [EntityTypeId] FROM [DLCatalog].[EntityType] WHERE [EntityTypeName] = 'View')\n       \t\tELSE 0  -- Undefined:  debería ser 0 en la tabla del catálogo\n       END AS [EntityTypeId],\n       'N' AS [EntityIsTemporary],\n       NULL AS [EntityDefinition],\n       NULL AS [EntityDataFlow],   -- AQUI HABRA QUE HACER OTRO SCRIPT QUE LO RELLENE CUANDO SE TENGA EN DATA FACTORY\n       (SELECT [DomainId] FROM [DLCatalog].[Domain] WHERE [DomainName] = '@{pipeline().parameters.domain}') AS [DomainId], \n       NULL AS [EntityLogicalName],\n       'N' AS [EntityIsForPrep],\n       (SELECT [RefreshTypeId] FROM [DLCatalog].[RefreshType] WHERE [RefreshTypeName] = 'Full') AS [RefreshTypeId],   -- Ponemos por defecto total y se cambia acorde a las necesidades-- EL TIPO DE REFRESCO LO PONDREMOS POR DEFECTO TOTAL Y LUEGO SOLO SE CAMBIAN LOS QUE SEA NECESARIO\n       'N' AS [EntityGDPR],\n       'N' AS [EntityBatchIngest]  -- Por defecto no activamos las tablas para ingestas de tipo batch (varias tablas en el mismo pipeline)\nFROM\n  \tStage.EntityST st\n WHERE NOT EXISTS\n (SELECT 1 \n  FROM [DLCatalog].[Entity] ent\n  WHERE \n  (st.EntityName = ent.EntityName) \n  AND (st.EntityDB = ent.EntityDB)\n  AND (ent.DomainId = (SELECT do.DomainId FROM [DLCatalog].[Domain] do WHERE do.DomainName = '@{pipeline().parameters.domain}')))\nORDER BY [EntityName];",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink"
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Stage",
+							"Table": "EntityST"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "DLCatalog",
+							"Table": "Entity"
+						}
+					}
+				]
+			},
+			{
+				"name": "Populate_Entity_Columns",
+				"description": "Carga los datos desde el área de stage comprobando que no hay duplicados",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Populate_Entity",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT en.EntityId AS [EntityId],\n\t   co.ColumnName AS [ColumnName],\n           ISNULL(dt.DataType, 'No existe conversion para el tipo ' + co.[ColumnType]) AS [ColumnType],\n\t   co.IsNullable AS [IsNullable]\nFROM Stage.EntityColumnST co\nLEFT JOIN DLCatalog.Entity en\nON co.EntityName = en.EntityName and co.EntityDB = en.EntityDB and co.EntitySchema = en.EntitySchema\nLEFT JOIN [DLCatalog].[DataTypesConversion] dt\nON co.ColumnType = dt.DataTypeDb \nWHERE co.EntitySchema = '@{pipeline().parameters.table_schema}'\nAND en.EntityId NOT IN (SELECT c.EntityId FROM DLCatalog.[EntityColumn] c )\nORDER BY co.EntityDB, co.EntitySchema, co.EntityName, co.ColumnName ;\n",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink"
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Stage",
+							"Table": "EntityST"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_dlcatalog_AzureSQL",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "DLCatalog",
+							"Table": "EntityColumn"
+						}
+					}
+				]
+			}
+		],
+		"parameters": {
+			"table_schema": {
+				"type": "string",
+				"defaultValue": "dbo"
+			},
+			"domain": {
+				"type": "string",
+				"defaultValue": "IngesportFinance"
+			},
+			"database_type": {
+				"type": "string",
+				"defaultValue": "Azure SQL Database"
+			}
+		},
+		"folder": {
+			"name": "Metadata"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-05-18T11:51:48Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

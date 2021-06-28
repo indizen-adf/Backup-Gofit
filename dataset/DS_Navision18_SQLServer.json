@@ -1,0 +1,24 @@
+{
+	"name": "DS_Navision18_SQLServer",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "IngesportNavision18",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Table": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "SQL Server"
+		},
+		"annotations": [],
+		"type": "SqlServerTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "@dataset().table"
+		}
+	}
+}

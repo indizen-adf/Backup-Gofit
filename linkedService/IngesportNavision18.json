@@ -1,0 +1,18 @@
+{
+	"name": "IngesportNavision18",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"description": "Conexión a la bdd (on-premise) SQL Server de Navision18",
+		"annotations": [],
+		"type": "SqlServer",
+		"typeProperties": {
+			"connectionString": "integrated security=True;data source=GOFIT-NAVPRO;initial catalog=NAV-PRO",
+			"userName": "INGESPORT\\lectura.indizennav",
+			"encryptedCredential": "eyJDcmVkZW50aWFsSWQiOiIyOThmMjY1My1mZmM5LTRlNjgtYmNhZi0xMTUxZGJlMDNhMDEiLCJWZXJzaW9uIjoiMi4wIiwiQ2xhc3NUeXBlIjoiTWljcm9zb2Z0LkRhdGFQcm94eS5Db3JlLkludGVyU2VydmljZURhdGFDb250cmFjdC5DcmVkZW50aWFsU1UwNkNZMTQifQ=="
+		},
+		"connectVia": {
+			"referenceName": "ingesport-sh-integrationRuntime1",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

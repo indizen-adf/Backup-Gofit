@@ -1,0 +1,26 @@
+{
+	"name": "DS_Ingesport_CRM",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "IngesportCRM",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Table": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "Dynamics_365"
+		},
+		"annotations": [],
+		"type": "DynamicsEntity",
+		"schema": [],
+		"typeProperties": {
+			"entityName": {
+				"value": "@dataset().Table",
+				"type": "Expression"
+			}
+		}
+	}
+}

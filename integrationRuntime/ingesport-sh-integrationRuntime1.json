@@ -1,0 +1,6 @@
+{
+	"name": "ingesport-sh-integrationRuntime1",
+	"properties": {
+		"type": "SelfHosted"
+	}
+}

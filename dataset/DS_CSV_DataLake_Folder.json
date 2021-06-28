@@ -1,0 +1,45 @@
+{
+	"name": "DS_CSV_DataLake_Folder",
+	"properties": {
+		"description": "Dataset genérico para leer ficheros CSV del Data Lake (separados por coma y con cabecera) a partir de un folder; es decir, sin  fichero específico",
+		"linkedServiceName": {
+			"referenceName": "DataLakeIngesport_ADLS_G2",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"container": {
+				"type": "string"
+			},
+			"domain": {
+				"type": "string"
+			},
+			"object": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "DataLakeStorage"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": {
+					"value": "@concat(dataset().domain, '/', dataset().object)",
+					"type": "Expression"
+				},
+				"fileSystem": {
+					"value": "@dataset().container",
+					"type": "Expression"
+				}
+			},
+			"columnDelimiter": ",",
+			"rowDelimiter": "\n",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	}
+}

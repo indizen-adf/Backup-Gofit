@@ -1,0 +1,28 @@
+{
+	"name": "DS_dlcatalog_AzureSQL",
+	"properties": {
+		"description": "Dataset genérico para accesos a la bdd dlcatalog. El esquema y la tabla han de ser pasados como parámetros de entrada",
+		"linkedServiceName": {
+			"referenceName": "dlcatalog_AzureSQL",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Schema": {
+				"type": "string"
+			},
+			"Table": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "Azure SQL"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": "@dataset().Schema",
+			"table": "@dataset().Table"
+		}
+	}
+}
